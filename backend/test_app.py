@@ -24,22 +24,26 @@ class TestNotesApp(unittest.TestCase):
         self.assertEqual(response.json, {"status": "healthy"})
 
     @patch('app.get_db_connection')
-    def test_get_notes_mocked(self):
+    def test_get_notes_mocked(self, mock_get_db_connection):
         """2. Тестирование бизнес-логики получения заметок с заглушкой БД"""
-        # Создаем фейковые объекты соединения и курсора базы данных
+        # Декоратор @patch сам создал мок и передал его в mock_get_db_connection
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
-
-        # Заставляем фейковый курсор возвращать готовую тестовую запись
+        
+        # Настраиваем цепочку вызовов: connection.cursor() -> fetchall() -> данные
         mock_cursor.fetchall.return_value = [(1, "Тестовый заголовок", "Тестовый текст")]
         mock_conn.cursor.return_value = mock_cursor
-
-        # Подменяем реальное подключение нашей заглушкой
-        with patch('app.get_db_connection', return_value=mock_conn):
-            response = self.client.get('/api/notes')
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(len(response.json), 1)
-            self.assertEqual(response.json[0]['title'], "Тестовый заголовок")
+        
+        # Заставляем наш перехваченный метод get_db_connection возвращать mock_conn
+        mock_get_db_connection.return_value = mock_conn
+        
+        # Делаем запрос к тестовому клиенту
+        response = self.client.get('/api/notes')
+        
+        # Проверяем утверждения
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json), 1)
+        self.assertEqual(response.json[0]['title'], "Тестовый заголовок")
 
 if __name__ == '__main__':
     unittest.main()
