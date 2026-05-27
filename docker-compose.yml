@@ -5,6 +5,7 @@ services:
     environment:
       POSTGRES_DB: "notes_db"
       POSTGRES_USER: "notes_user"
+    # ... (все окружение и тома для db остаются как в v4/v5)
       POSTGRES_PASSWORD: "password123"
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -44,8 +45,40 @@ services:
     networks:
       - project1-network
 
+  # --- НОВЫЕ СЛУЖБЫ МОНИТОРИНГА ---
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: project1-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - promdata:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+    networks:
+      - project1-network
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: project1-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - project1-network
+
 volumes:
   pgdata:
+  promdata:
+  grafanadata:
 
 networks:
   project1-network:

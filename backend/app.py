@@ -2,9 +2,15 @@ import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import psycopg2
+from prometheus_flask_exporter import PrometheusMetrics
 
 app = Flask(__name__)
 CORS(app) # Разрешаем кросс-доменные запросы
+
+# ИНИЦИАЛИЗАЦИЯ МЕТРИК
+metrics = PrometheusMetrics(app)
+# Добавляем статическую информацию о приложении
+metrics.info('app_info', 'Application info', version='1.0.0')
 
 # Настройки подключения берутся из переменных окружения с дефолтами
 DB_HOST = os.getenv("DB_HOST", "localhost")
