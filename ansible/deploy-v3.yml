@@ -1,0 +1,82 @@
+---
+- name: Deploy Project 1 (Version 3 - Docker + Ansible)
+  hosts: webservers
+  become: true
+  vars:
+    repo_url: "https://github.com/almatrosov/devops1_1.git"
+    repo_branch: "main"
+
+    nginx_port: 8081
+    db_name: "notes_db"
+    db_user: "notes_user"
+    db_password: "password123"
+
+    repo_root: "/opt/project1"
+
+  tasks:
+    - name: 1. Очистить конфликты (Остановить службы Версии 1 и 2 на хосте)
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      failed_when: false # Если служб не было, плейбук не упадет
+      loop:
+        - project1-backend.service
+        - nginx
+        - postgresql
+
+    - name: 2. Установить зависимости для Docker
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: yes
+
+    - name: 3. Добавить официальный GPG-ключ Docker
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: 4. Добавить репозиторий Docker
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: 5. Установить Docker и Docker Compose Plugin
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: 6. Убедиться, что Docker запущен
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: 7. Обновить исходный код проекта из GitHub
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_root }}"
+        version: "{{ repo_branch }}"
+        force: yes
+
+    - name: 8. Создать docker-compose.yml из шаблона
+      ansible.builtin.template:
+        src: templates/docker-compose.yml.j2
+        dest: "{{ repo_root }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: 9. Собрать образы и запустить контейнеры через Docker Compose
+      # Используем shell, так как модуль docker_compose требует дополнительных python-библиотек на хосте
+      ansible.builtin.shell:
+        cmd: "docker compose down && docker compose up -d --build"
+        chdir: "{{ repo_root }}"

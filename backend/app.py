@@ -48,4 +48,7 @@ def add_note():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5001)
+    # В Docker критически важно слушать 0.0.0.0
+    import os
+    host_ip = os.getenv("HOST", "0.0.0.0")
+    app.run(host=host_ip, port=5001)
