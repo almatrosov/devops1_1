@@ -1,0 +1,145 @@
+---
+- name: Deploy Project 1 (Version 2 - Ansible)
+  hosts: webservers
+  become: true
+  vars:
+    # Определение переменных для легкого изменения конфигурации
+    nginx_port: 8081
+    backend_port: 5001
+    db_name: "notes_db"
+    db_user: "notes_user"
+    db_password: "password123"
+    
+    repo_root: "/opt/project1"
+    backend_dir: "/opt/project1/backend"
+    frontend_www_dir: "/var/www/project1"
+
+  tasks:
+    - name: 1. Обновить кэш apt и установить системные пакеты
+      ansible.builtin.apt:
+        name:
+          - python3-pip
+          - python3-venv
+          - postgresql
+          - postgresql-contrib
+          - nginx
+          - git
+        state: present
+        update_cache: yes
+
+    - name: 2. Проверить, существует ли база данных
+      ansible.builtin.shell: "sudo -u postgres psql -tAc \"SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'\""
+      register: db_exists
+      changed_when: false
+
+    - name: 3. Создать базу данных PostgreSQL
+      ansible.builtin.shell: "sudo -u postgres psql -c \"CREATE DATABASE {{ db_name }};\""
+      when: db_exists.stdout != "1"
+
+    - name: 4. Проверить, существует ли пользователь базы данных
+      ansible.builtin.shell: "sudo -u postgres psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'\""
+      register: user_exists
+      changed_when: false
+
+    - name: 5. Создать пользователя базы данных и задать пароль
+      ansible.builtin.shell: "sudo -u postgres psql -c \"CREATE USER {{ db_user }} WITH PASSWORD '{{ db_password }}';\""
+      when: user_exists.stdout != "1"
+
+    - name: 6. Предоставить права пользователю на БД
+      ansible.builtin.shell: "sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE {{ db_name }} TO {{ db_user }};\""
+      changed_when: false
+
+    - name: 7. Создать структуру таблиц (если не создана)
+      ansible.builtin.shell: |
+        sudo -u postgres psql -d {{ db_name }} -c "
+        CREATE TABLE IF NOT EXISTS notes (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(100) NOT NULL,
+            content TEXT NOT NULL
+        );
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {{ db_user }};
+        GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {{ db_user }};
+        "
+      register: table_init
+      changed_when: "'CREATE TABLE' in table_init.stdout"
+
+    - name: 8. Создать целевую директорию для проекта
+      ansible.builtin.file:
+        path: "{{ repo_root }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user | default(ansible_env.USER) }}"
+
+    - name: 9. Симуляция получения кода (Копирование локальных файлов проекта на сервере)
+      # В реальном сценарии здесь будет модуль ansible.builtin.git
+      # Для учебного примера копируем файлы из текущей рабочей директории
+      ansible.builtin.copy:
+        src: "../"
+        dest: "{{ repo_root }}/"
+        mode: '0755'
+
+    - name: 10. Создать Python Virtual Environment для бэкенда
+      ansible.builtin.pip:
+        requirements: "{{ backend_dir }}/requirements.txt"
+        virtualenv: "{{ backend_dir }}/venv"
+        virtualenv_command: python3 -m venv
+
+    - name: 11. Создать и настроить Systemd юнит из шаблона
+      ansible.builtin.template:
+        src: templates/project1-backend.service.j2
+        dest: /etc/systemd/system/project1-backend.service
+        mode: '0644'
+      notify: Reload Systemd
+
+    - name: 12. Запустить и включить службу бэкенда
+      ansible.builtin.systemd:
+        name: project1-backend.service
+        state: started
+        enabled: yes
+
+    - name: 13. Создать директорию для статики фронтенда
+      ansible.builtin.file:
+        path: "{{ frontend_www_dir }}"
+        state: directory
+        mode: '0755'
+        owner: www-data
+        group: www-data
+
+    - name: 14. Скопировать index.html во внутренний каталог Nginx
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/frontend/index.html"
+        dest: "{{ frontend_www_dir }}/index.html"
+        remote_src: yes
+        mode: '0644'
+        owner: www-data
+        group: www-data
+
+    - name: 15. Создать конфигурацию Nginx из шаблона
+      ansible.builtin.template:
+        src: templates/project1.conf.j2
+        dest: /etc/nginx/sites-available/project1.conf
+        mode: '0644'
+      notify: Restart Nginx
+
+    - name: 16. Активировать конфигурацию Nginx (симлинк)
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/project1.conf
+        dest: /etc/nginx/sites-enabled/project1.conf
+        state: link
+      notify: Restart Nginx
+
+    - name: 17. Удалить дефолтный конфиг Nginx (чтобы избежать конфликтов портов)
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Restart Nginx
+
+  handlers:
+    - name: Reload Systemd
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
