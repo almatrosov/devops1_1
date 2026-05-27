@@ -47,6 +47,11 @@ def add_note():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    # Простой эндпоинт для проверки работоспособности самого Flask-сервиса
+    return jsonify({"status": "healthy"}), 200
+
 if __name__ == '__main__':
     # В Docker критически важно слушать 0.0.0.0
     import os
