@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     triggers {
-        // Опрашивать репозиторий на наличие новых коммитов каждую минуту
         pollSCM('* * * * *')
     }
 
@@ -16,9 +15,9 @@ pipeline {
 
         stage('Docker Deploy') {
             steps {
-                echo 'Перезапускаем контейнеры с новым кодом...'
-                sh 'docker compose down'
-                sh 'docker compose up -d --build'
+                echo 'Управляем контейнерами проекта project1...'
+                sh 'docker compose -p project1 down'
+                sh 'docker compose -p project1 up -d --build'
             }
         }
     }
