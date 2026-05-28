@@ -43,8 +43,38 @@ services:
     networks:
       - project_01-network
 
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: project_01-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - promdata_01:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9001:9090" # Внешний порт вашей группы (например, 9003) -> 9090 внутри
+    depends_on:
+      - backend
+    networks:
+      - project_01-network
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: project_01-grafana
+    ports:
+      - "3001:3000" # Внешний порт вашей группы (например, 3003) -> 3000 внутри
+    volumes:
+      - grafanadata_01:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - project_01-network
+
 volumes:
   pgdata_01:
+  promdata_01:
+  grafanadata_01:
 
 networks:
   project_01-network:
