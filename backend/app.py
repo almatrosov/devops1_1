@@ -8,7 +8,7 @@ app = Flask(__name__)
 CORS(app)
 
 # --- ИНИЦИАЛИЗАЦИЯ ЭКСПОРТЕРА МЕТРИК ---
-metrics = PrometheusMetrics(app)
+metrics = PrometheusMetrics(app, path='/api/metrics')
 # Добавляем статическую информацию о версии приложения
 metrics.info('app_info', 'Application info', version='1.0.0')
 
