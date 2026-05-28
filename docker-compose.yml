@@ -44,7 +44,7 @@ services:
       - project_01-network
 
 volumes:
-  pgdata01:
+  pgdata_01:
 
 networks:
   project_01-network:
