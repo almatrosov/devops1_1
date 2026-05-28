@@ -46,6 +46,11 @@ def add_note():
         return jsonify({"id": note_id, "title": data['title'], "content": data['content']}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    # Легковесный эндпоинт для проверки статуса самого Flask-приложения
+    return jsonify({"status": "healthy"}), 200
 
 if __name__ == '__main__':
     # ВНИМАНИЕ: Укажите выделенный порт вашей группы 50GG (например, 5003)
