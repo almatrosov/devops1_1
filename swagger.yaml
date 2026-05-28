@@ -1,0 +1,57 @@
+swagger: "2.0"
+info:
+  title: "Notes API — Team 01"
+  version: "1.0.0"
+  description: "Простой API для управления заметками (Развертывание на порту 8001)"
+basePath: "/api"
+schemes:
+  - "http"
+paths:
+  /notes:
+    get:
+      summary: "Получить список всех заметок"
+      responses:
+        200:
+          description: "Успешный возврат списка заметок"
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/Note"
+    post:
+      summary: "Создать новую заметку"
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            $ref: "#/definitions/NoteInput"
+      responses:
+        201:
+          description: "Заметка успешно создана"
+          schema:
+            $ref: "#/definitions/Note"
+definitions:
+  NoteInput:
+    type: "object"
+    required:
+      - "title"
+      - "content"
+    properties:
+      title:
+        type: "string"
+        example: "Купить учебник по DevOps"
+      content:
+        type: "string"
+        example: "Изучить архитектуру systemd и конфигурацию Nginx"
+  Note:
+    type: "object"
+    properties:
+      id:
+        type: "integer"
+        example: 1
+      title:
+        type: "string"
+        example: "Купить учебник по DevOps"
+      content:
+        type: "string"
+        example: "Изучить архитектуру systemd и конфигурацию Nginx"
