@@ -1,0 +1,46 @@
+---
+- name: Deploy Project 1 (Version 3 - Containerization with Docker Compose)
+  hosts: webservers
+  become: true
+  vars:
+    # --- НАСТРОЙКИ КОМАНДЫ ---
+    group_code: "01" # Укажите ваш двухзначный код группы (например, "03")
+    repo_url: "https://github.com/almatrosov/devops1_1"
+    repo_branch: "main"
+
+    repo_root: "/opt/project_{{ group_code }}"
+    old_service_name: "project_{{ group_code }}-backend.service"
+    old_nginx_conf: "project_{{ group_code }}.conf"
+
+  tasks:
+    - name: 1. Остановить и полностью отключить старую службу бэкенда на хосте
+      ansible.builtin.systemd:
+        name: "{{ old_service_name }}"
+        state: stopped
+        enabled: false
+      failed_when: false # Игнорировать ошибку, если служба уже удалена или отсутствует
+
+    - name: 2. Удалить старый конфигурационный файл Nginx на хосте
+      ansible.builtin.file:
+        path: "/etc/nginx/sites-enabled/{{ old_nginx_conf }}"
+        state: absent
+      notify: Restart Host Nginx
+
+    - name: 3. Синхронизировать свежий код и Docker-файлы из репозитория GitHub
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_root }}"
+        version: "{{ repo_branch }}"
+        force: yes
+
+    - name: 4. Запустить сборку образов и поднять контейнеры через Docker Compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ repo_root }}"
+        state: present
+        build: always
+
+  handlers:
+    - name: Restart Host Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted

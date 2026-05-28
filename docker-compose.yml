@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: project_01-db
+    environment:
+      POSTGRES_DB: "notes_db_01"
+      POSTGRES_USER: "notes_user_01"
+      POSTGRES_PASSWORD: "password123"
+    volumes:
+      - pgdata_01:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5401:5432" # Проброс: ваш командный порт СУБД наружу -> 5432 внутрь
+    networks:
+      - project_01-network
+
+  backend:
+    build:
+      context: ./backend
+    container_name: project_01-backend
+    environment:
+      DB_HOST: db # Имя сервиса БД в сети Compose
+      DB_NAME: "notes_db_01"
+      DB_USER: "notes_user_01"
+      DB_PASS: "password123"
+    ports:
+      - "5001:5000" # Проброс: ваш командный порт бэкенда наружу -> 5000 внутрь
+    depends_on:
+      - db
+    networks:
+      - project_01-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: project_01-nginx
+    ports:
+      - "8001:80" # Проброс: ваш командный порт веб-сайта наружу -> 80 внутрь
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend
+    networks:
+      - project_01-network
+
+volumes:
+  pgdata_01:
+
+networks:
+  project_01-network:
+    name: project_01-network
