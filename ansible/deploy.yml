@@ -1,0 +1,141 @@
+---
+- name: Deploy Project 1 (Version 2 - Ansible with GitHub Integration)
+  hosts: webservers
+  become: true
+  vars:
+    # --- НАСТРОЙКИ КОМАНДЫ (СТУДЕНТЫ ЗАПОЛНЯЮТ САМОСТОЯТЕЛЬНО) ---
+    group_code: "01" # Укажите ваш двухзначный код группы (например, "03")
+    repo_url: "https://github.com/almatrosov/devops1_1"
+    repo_branch: "main"
+    db_password: "password123"
+
+    # --- АВТОМАТИЧЕСКИЙ РАСЧЕТ ПАРАМЕТРОВ ИНФРАСТРУКТУРЫ ---
+    nginx_port: "80{{ group_code }}"
+    backend_port: "50{{ group_code }}"
+    db_name: "notes_db_{{ group_code }}"
+    db_user: "notes_user_{{ group_code }}"
+    
+    repo_root: "/opt/project_{{ group_code }}"
+    backend_dir: "/opt/project_{{ group_code }}/backend"
+    frontend_www_dir: "/var/www/project_{{ group_code }}"
+    service_name: "project_{{ group_code }}-backend.service"
+    nginx_conf_name: "project_{{ group_code }}.conf"
+
+  tasks:
+    - name: 1. Проверить существование базы данных
+      ansible.builtin.shell: "sudo -u postgres psql -tAc \"SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'\""
+      register: db_exists
+      changed_when: false
+
+    - name: 2. Создать базу данных PostgreSQL (если отсутствует)
+      ansible.builtin.shell: "sudo -u postgres psql -c \"CREATE DATABASE {{ db_name }};\""
+      when: db_exists.stdout != "1"
+
+    - name: 3. Проверить существование пользователя СУБД
+      ansible.builtin.shell: "sudo -u postgres psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'\""
+      register: user_exists
+      changed_when: false
+
+    - name: 4. Создать пользователя базы данных (если отсутствует)
+      ansible.builtin.shell: "sudo -u postgres psql -c \"CREATE USER {{ db_user }} WITH PASSWORD '{{ db_password }}';\""
+      when: user_exists.stdout != "1"
+
+    - name: 5. Предоставить права пользователю на созданную БД
+      ansible.builtin.shell: "sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE {{ db_name }} TO {{ db_user }};\""
+      changed_when: false
+
+    - name: 6. Инициализировать схему таблиц и раздать права
+      ansible.builtin.shell: |
+        sudo -u postgres psql -d {{ db_name }} -c "
+        CREATE TABLE IF NOT EXISTS notes (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(100) NOT NULL,
+            content TEXT NOT NULL
+        );
+        GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {{ db_user }};
+        GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {{ db_user }};
+        "
+      register: table_init
+      changed_when: "'CREATE TABLE' in table_init.stdout"
+
+    # --- УПРАВЛЕНИЕ КОНФЛИКТАМИ И СИНХРОНИЗАЦИЯ С GIT ---
+
+    - name: 7. Проверить наличие корректной Git-структуры в целевой папке
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/.git"
+      register: git_folder
+
+    - name: 8. Удалить остатки ручного деплоя v1, если папка не привязана к Git
+      ansible.builtin.file:
+        path: "{{ repo_root }}"
+        state: absent
+      when: not git_folder.stat.exists
+
+    - name: 9. Синхронизировать исходный код напрямую из репозитория GitHub
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_root }}"
+        version: "{{ repo_branch }}"
+        force: yes
+
+    # --- НАСТРОЙКА И ЗАПУСК КОМПОНЕНТОВ ---
+
+    - name: 10. Настроить изолированное venv-окружение Python для бэкенда
+      ansible.builtin.pip:
+        requirements: "{{ backend_dir }}/requirements.txt"
+        virtualenv: "{{ backend_dir }}/venv"
+        virtualenv_command: python3 -m venv
+
+    - name: 11. Сгенерировать и разместить Systemd юнит-файл из шаблона
+      ansible.builtin.template:
+        src: templates/project_backend.service.j2
+        dest: "/etc/systemd/system/{{ service_name }}"
+        mode: '0644'
+      notify: Reload Systemd
+
+    - name: 12. Запустить и добавить службу бэкенда в автозагрузку
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        state: restarted
+        enabled: yes
+
+    - name: 13. Обеспечить существование каталога для статики фронтенда
+      ansible.builtin.file:
+        path: "{{ frontend_www_dir }}"
+        state: directory
+        mode: '0755'
+        owner: www-data
+        group: www-data
+
+    - name: 14. Скопировать index.html в рабочий веб-каталог Nginx
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/frontend/index.html"
+        dest: "{{ frontend_www_dir }}/index.html"
+        remote_src: yes
+        mode: '0644'
+        owner: www-data
+        group: www-data
+
+    - name: 15. Сгенерировать конфигурацию хоста Nginx из шаблона
+      ansible.builtin.template:
+        src: templates/project_nginx.conf.j2
+        dest: "/etc/nginx/sites-available/{{ nginx_conf_name }}"
+        mode: '0644'
+      notify: Restart Nginx
+
+    - name: 16. Активировать конфигурацию Nginx (создать символическую ссылку)
+      ansible.builtin.file:
+        src: "/etc/nginx/sites-available/{{ nginx_conf_name }}"
+        dest: "/etc/nginx/sites-enabled/{{ nginx_conf_name }}"
+        state: link
+      notify: Restart Nginx
+
+  handlers:
+    - name: Reload Systemd
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Restart Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted

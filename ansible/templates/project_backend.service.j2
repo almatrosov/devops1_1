@@ -1,0 +1,15 @@
+[Unit]
+Description=Project {{ group_code }} Flask Backend Service (Automated via Ansible)
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory={{ backend_dir }}
+Environment="DB_HOST=localhost" "DB_NAME={{ db_name }}" "DB_USER={{ db_user }}" "DB_PASS={{ db_password }}"
+ExecStart={{ backend_dir }}/venv/bin/python app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
