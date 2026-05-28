@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Сервис заметок — Команда 01</title>
+    <title>Сервис заметок — Команда GG</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f4; }
         .container { max-width: 500px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
@@ -15,69 +15,18 @@
 </head>
 <body>
     <div class="container">
-        <h2>Новая заметка (Команда 01)</h2>
+        <h2>Новая заметка (Команда GG)</h2>
         <input type="text" id="title" placeholder="Заголовок заметки">
         <textarea id="content" placeholder="Текст заметки" rows="3"></textarea>
         <button onclick="createNote()">Сохранить</button>
-
-        <h2>Архив заметок (версия 4 – автоматизация с Jenkins)</h2>
-        <ul id="notes-list"></ul>
-    </div>
-
-    <script>
-        const apiUrl = '/api/notes';
-
-        async function fetchNotes() {
-            try {
-                const response = await fetch(apiUrl);
-                const notes = await response.json();
-                const list = document.getElementById('notes-list');
-                list.innerHTML = '';
-                notes.forEach(note => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `<strong>${note.title}</strong>: ${note.content}`;
-                    list.appendChild(li);
-                });
-            } catch (error) {
-                console.error('Ошибка получения данных:', error);
-            }
-        }
-
-        async function createNote() {
-            const title = document.getElementById('title').value;
-            const content = document.getElementById('content').value;
-            if (!title || !content) return alert('Заполните все поля!');
-
-            try {
-                await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, content })
-                });
-                document.getElementById('title').value = '';
-                document.getElementById('content').value = '';
-                fetchNotes();
-            } catch (error) {
-                console.error('Ошибка создания заметки:', error);
-            }
-        }
-
-        fetchNotes();
-    </script>
-</body>
-</html>    <div class="container">
-        <h2>Новая заметка (Команда 01)</h2>
-        <input type="text" id="title" placeholder="Заголовок заметки">
-        <textarea id="content" placeholder="Текст заметки" rows="3"></textarea>
-        <button onclick="createNote()">Сохранить</button>
-
+ 
         <h2>Архив заметок</h2>
         <ul id="notes-list"></ul>
     </div>
-
+ 
     <script>
         const apiUrl = '/api/notes';
-
+ 
         async function fetchNotes() {
             try {
                 const response = await fetch(apiUrl);
@@ -90,15 +39,15 @@
                     list.appendChild(li);
                 });
             } catch (error) {
-                console.error('Ошибка получения данных:', error);
+               console.error('Ошибка получения данных:', error);
             }
         }
-
+ 
         async function createNote() {
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
             if (!title || !content) return alert('Заполните все поля!');
-
+ 
             try {
                 await fetch(apiUrl, {
                     method: 'POST',
@@ -112,7 +61,7 @@
                 console.error('Ошибка создания заметки:', error);
             }
         }
-
+ 
         fetchNotes();
     </script>
 </body>
